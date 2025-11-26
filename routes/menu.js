@@ -5,8 +5,18 @@ const adminAuth = require("../middleware/adminAuth")
 
 const router = express.Router()
 
-// Get all menu items
+// Get all menu items (only available ones for users)
 router.get("/", async (req, res) => {
+  try {
+    const menuItems = await MenuItem.find({ available: true }).sort({ category: 1, name: 1 })
+    res.json(menuItems)
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message })
+  }
+})
+
+// Get all menu items including unavailable (Admin only)
+router.get("/all", auth, adminAuth, async (req, res) => {
   try {
     const menuItems = await MenuItem.find().sort({ category: 1, name: 1 })
     res.json(menuItems)
