@@ -6,6 +6,10 @@ const orderSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  userName: {
+    type: String,
+    required: true,
+  },
   tableNumber: {
     type: Number,
     required: true,
@@ -15,6 +19,10 @@ const orderSchema = new mongoose.Schema({
       menuItem: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "MenuItem",
+        required: true,
+      },
+      name: {
+        type: String,
         required: true,
       },
       quantity: {
@@ -34,7 +42,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["pending", "preparing", "ready", "delivered", "cancelled"],
+    enum: ["pending", "preparing", "ready", "served", "paid", "cancelled"],
     default: "pending",
   },
   specialInstructions: {

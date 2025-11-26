@@ -19,6 +19,21 @@ router.get("/", auth, adminAuth, async (req, res) => {
   }
 })
 
+// Get orders by status (Admin only)
+router.get("/status/:status", auth, adminAuth, async (req, res) => {
+  try {
+    const { status } = req.params
+    const orders = await Order.find({ status })
+      .populate("user", "name email tableNumber")
+      .populate("items.menuItem", "name price")
+      .sort({ createdAt: -1 })
+
+    res.json(orders)
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message })
+  }
+})
+
 // Get user's orders
 router.get("/my-orders", auth, async (req, res) => {
   try {
@@ -57,29 +72,68 @@ router.get("/:id", auth, async (req, res) => {
 // Create new order
 router.post("/", auth, async (req, res) => {
   try {
-    const { tableNumber, items, totalAmount, specialInstructions } = req.body
+    const { tableNumber, items, specialInstructions } = req.body
+
+    // Fetch user details
+    const User = require("../models/User")
+    const user = await User.findById(req.user.userId)
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+
+    // Fetch menu items to get prices and calculate total
+    const MenuItem = require("../models/MenuItem")
+    const orderItems = []
+    let totalAmount = 0
+
+    for (const item of items) {
+      const menuItem = await MenuItem.findById(item.menuItemId)
+      if (!menuItem) {
+        return res.status(404).json({ message: `Menu item not found: ${item.menuItemId}` })
+      }
+
+      const itemTotal = menuItem.price * item.quantity
+      totalAmount += itemTotal
+
+      orderItems.push({
+        menuItem: menuItem._id,
+        name: menuItem.name,
+        quantity: item.quantity,
+        price: menuItem.price,
+      })
+    }
 
     const order = new Order({
       user: req.user.userId,
+      userName: user.name,
       tableNumber,
-      items,
+      items: orderItems,
       totalAmount,
-      specialInstructions,
+      specialInstructions: specialInstructions || "",
     })
 
     await order.save()
+    
+    // Populate with full details for response
+    await order.populate("user", "name email")
     await order.populate("items.menuItem", "name price image")
 
     res.status(201).json({ message: "Order placed successfully", order })
   } catch (error) {
+    console.error("Order creation error:", error)
     res.status(500).json({ message: "Server error", error: error.message })
   }
 })
 
 // Update order status (Admin only)
-router.patch("/:id/status", auth, adminAuth, async (req, res) => {
+router.put("/:id/status", auth, adminAuth, async (req, res) => {
   try {
     const { status } = req.body
+
+    const validStatuses = ["pending", "preparing", "ready", "served", "paid", "cancelled"]
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" })
+    }
 
     const order = await Order.findByIdAndUpdate(req.params.id, { status, updatedAt: Date.now() }, { new: true })
       .populate("user", "name email tableNumber")
@@ -91,6 +145,7 @@ router.patch("/:id/status", auth, adminAuth, async (req, res) => {
 
     res.json({ message: "Order status updated successfully", order })
   } catch (error) {
+    console.error("Status update error:", error)
     res.status(500).json({ message: "Server error", error: error.message })
   }
 })
