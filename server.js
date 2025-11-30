@@ -32,14 +32,14 @@ const orderRoutes = require("./routes/order")
 const analyticsRoutes = require("./routes/analytics")
 
 // Routes
-app.use("/",(req,res)=>{
-res.json({message:"server is running",success:true})
-})
 app.use("/api/auth", authRoutes)
 app.use("/api/menu", menuRoutes)
 app.use("/api/orders", orderRoutes)
 app.use("/api/analytics", analyticsRoutes)
 
+app.get("/",(req,res)=>{
+res.json({message:"server is running",success:true})
+})
 // Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "Server is running" })
