@@ -30,12 +30,14 @@ const authRoutes = require("./routes/auth")
 const menuRoutes = require("./routes/menu")
 const orderRoutes = require("./routes/order")
 const analyticsRoutes = require("./routes/analytics")
+const uploadRoutes = require("./routes/upload")
 
 // Routes
 app.use("/api/auth", authRoutes)
 app.use("/api/menu", menuRoutes)
 app.use("/api/orders", orderRoutes)
 app.use("/api/analytics", analyticsRoutes)
+app.use("/api/upload", uploadRoutes)
 
 app.get("/",(req,res)=>{
 res.json({message:"server is running",success:true})
