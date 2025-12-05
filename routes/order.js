@@ -72,7 +72,7 @@ router.get("/:id", auth, async (req, res) => {
 // Create new order
 router.post("/", auth, async (req, res) => {
   try {
-    const { tableNumber, items, specialInstructions } = req.body
+    const { tableNumber, items, specialInstructions, couponCode, discount } = req.body
 
     // Fetch user details
     const User = require("../models/User")
@@ -103,16 +103,30 @@ router.post("/", auth, async (req, res) => {
       })
     }
 
+    const finalAmount = totalAmount - (discount || 0)
+
     const order = new Order({
       user: req.user.userId,
       userName: user.name,
       tableNumber,
       items: orderItems,
       totalAmount,
+      couponCode: couponCode || null,
+      discount: discount || 0,
+      finalAmount,
       specialInstructions: specialInstructions || "",
     })
 
     await order.save()
+    
+    // If coupon was used, increment its usage count
+    if (couponCode) {
+      const Coupon = require("../models/Coupon")
+      await Coupon.findOneAndUpdate(
+        { code: couponCode.toUpperCase() },
+        { $inc: { usedCount: 1 } }
+      )
+    }
     
     // Populate with full details for response
     await order.populate("user", "name email")
