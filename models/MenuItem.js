@@ -26,6 +26,15 @@ const menuItemSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isSpecialOffer: {
+    type: Boolean,
+    default: false,
+  },
+  specialOfferId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "SpecialOffer",
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

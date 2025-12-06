@@ -49,7 +49,7 @@ const analyticsRoutes = require("./routes/analytics")
 const uploadRoutes = require("./routes/upload")
 const couponRoutes = require("./routes/coupon")
 const reviewRoutes = require("./routes/review")
-const comboRoutes = require("./routes/combo")
+const specialOfferRoutes = require("./routes/specialOffer")
 
 // Routes
 app.use("/api/auth", authRoutes)
@@ -59,7 +59,7 @@ app.use("/api/analytics", analyticsRoutes)
 app.use("/api/upload", uploadRoutes)
 app.use("/api/coupons", couponRoutes)
 app.use("/api/reviews", reviewRoutes)
-app.use("/api/combos", comboRoutes)
+app.use("/api/special-offers", specialOfferRoutes)
 
 // Root route
 app.get("/", (_req, res) => {
