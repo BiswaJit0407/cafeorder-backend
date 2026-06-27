@@ -90,6 +90,7 @@ const couponRoutes = require("./routes/coupon")
 const reviewRoutes = require("./routes/review")
 const specialOfferRoutes = require("./routes/specialOffer")
 const notificationRoutes = require("./routes/notification")
+const comboRoutes = require("./routes/combo")
 
 // Routes
 app.use("/api/auth", authRoutes)
@@ -101,6 +102,7 @@ app.use("/api/coupons", couponRoutes)
 app.use("/api/reviews", reviewRoutes)
 app.use("/api/special-offers", specialOfferRoutes)
 app.use("/api/notifications", notificationRoutes)
+app.use("/api/combos", comboRoutes)
 
 // Root route
 app.get("/", (_req, res) => {
