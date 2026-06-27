@@ -106,6 +106,22 @@ router.post("/", auth, async (req, res) => {
 
     const finalAmount = totalAmount - (discount || 0)
 
+    const Table = require("../models/Table")
+    const table = await Table.findOne({ tableNumber })
+    if (!table) {
+      return res.status(400).json({ message: "Invalid table selected" })
+    }
+
+    if (table.status === "occupied" && table.currentUserId.toString() !== req.user.userId) {
+      return res.status(400).json({ message: "This table is already occupied" })
+    }
+
+    if (table.status === "available") {
+      table.status = "occupied"
+      table.currentUserId = req.user.userId
+      await table.save()
+    }
+
     const order = new Order({
       user: req.user.userId,
       userName: user.name,
@@ -183,6 +199,14 @@ router.put("/:id/status", auth, adminAuth, async (req, res) => {
       return res.status(404).json({ message: "Order not found" })
     }
 
+    if (status === "paid" || status === "cancelled") {
+      const activeOrders = await Order.countDocuments({ user: order.user._id, status: { $nin: ["paid", "cancelled"] } })
+      if (activeOrders === 0) {
+        const Table = require("../models/Table")
+        await Table.updateMany({ currentUserId: order.user._id }, { status: "available", currentUserId: null })
+      }
+    }
+
     // Notify user
     try {
       const io = req.app.get('io')
@@ -234,6 +258,12 @@ router.patch("/:id/cancel", auth, async (req, res) => {
     order.status = "cancelled"
     order.updatedAt = Date.now()
     await order.save()
+
+    const activeOrders = await Order.countDocuments({ user: order.user, status: { $nin: ["paid", "cancelled"] } })
+    if (activeOrders === 0) {
+      const Table = require("../models/Table")
+      await Table.updateMany({ currentUserId: order.user }, { status: "available", currentUserId: null })
+    }
 
     res.json({ message: "Order cancelled successfully", order })
   } catch (error) {
