@@ -1,5 +1,7 @@
 const express = require("express")
 const Order = require("../models/Order")
+const User = require("../models/User")
+const Notification = require("../models/Notification")
 const auth = require("../middleware/auth")
 const adminAuth = require("../middleware/adminAuth")
 
@@ -75,7 +77,6 @@ router.post("/", auth, async (req, res) => {
     const { tableNumber, items, specialInstructions, couponCode, discount } = req.body
 
     // Fetch user details
-    const User = require("../models/User")
     const user = await User.findById(req.user.userId)
     if (!user) {
       return res.status(404).json({ message: "User not found" })
@@ -132,6 +133,31 @@ router.post("/", auth, async (req, res) => {
     await order.populate("user", "name email")
     await order.populate("items.menuItem", "name price image")
 
+    // Notify admins
+    try {
+      const admins = await User.find({ role: "admin" })
+      const io = req.app.get('io')
+      const connectedUsers = req.app.get('connectedUsers')
+
+      for (const admin of admins) {
+        const notification = new Notification({
+          userId: admin._id,
+          title: "New Order",
+          message: `Order #${order._id.toString().substring(0, 8)} placed by ${user.name} (Table ${tableNumber})`,
+          type: "NEW_ORDER",
+          link: "/admin-dashboard"
+        })
+        await notification.save()
+
+        const socketId = connectedUsers.get(admin._id.toString())
+        if (socketId && io) {
+          io.to(socketId).emit("new_notification", notification)
+        }
+      }
+    } catch (notifErr) {
+      console.error("Error creating notification:", notifErr)
+    }
+
     res.status(201).json({ message: "Order placed successfully", order })
   } catch (error) {
     console.error("Order creation error:", error)
@@ -155,6 +181,28 @@ router.put("/:id/status", auth, adminAuth, async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" })
+    }
+
+    // Notify user
+    try {
+      const io = req.app.get('io')
+      const connectedUsers = req.app.get('connectedUsers')
+      
+      const notification = new Notification({
+        userId: order.user._id,
+        title: "Order Status Updated",
+        message: `Your order is now: ${status.toUpperCase()}`,
+        type: "ORDER_UPDATE",
+        link: "/my-orders"
+      })
+      await notification.save()
+
+      const socketId = connectedUsers.get(order.user._id.toString())
+      if (socketId && io) {
+        io.to(socketId).emit("new_notification", notification)
+      }
+    } catch (notifErr) {
+      console.error("Error creating notification:", notifErr)
     }
 
     res.json({ message: "Order status updated successfully", order })
