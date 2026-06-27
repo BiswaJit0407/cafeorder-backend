@@ -92,6 +92,8 @@ const specialOfferRoutes = require("./routes/specialOffer")
 const notificationRoutes = require("./routes/notification")
 const comboRoutes = require("./routes/combo")
 const tableRoutes = require("./routes/table")
+const settingsRoutes = require("./routes/settings")
+const loyaltyRoutes = require("./routes/loyalty")
 
 // Routes
 app.use("/api/auth", authRoutes)
@@ -105,6 +107,8 @@ app.use("/api/special-offers", specialOfferRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/combos", comboRoutes)
 app.use("/api/tables", tableRoutes)
+app.use("/api/settings", settingsRoutes)
+app.use("/api/loyalty", loyaltyRoutes)
 
 // Root route
 app.get("/", (_req, res) => {

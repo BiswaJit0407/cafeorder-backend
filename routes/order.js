@@ -74,7 +74,7 @@ router.get("/:id", auth, async (req, res) => {
 // Create new order
 router.post("/", auth, async (req, res) => {
   try {
-    const { tableNumber, items, specialInstructions, couponCode, discount } = req.body
+    const { tableNumber, items, specialInstructions, couponCode, discount, redeemPoints } = req.body
 
     // Fetch user details
     const user = await User.findById(req.user.userId)
@@ -104,7 +104,33 @@ router.post("/", auth, async (req, res) => {
       })
     }
 
-    const finalAmount = totalAmount - (discount || 0)
+    let loyaltyDiscount = 0
+    let pointsToRedeem = 0
+    if (redeemPoints && redeemPoints > 0) {
+      const SystemSettings = require("../models/SystemSettings")
+      const settings = await SystemSettings.findOne({ isGlobal: true })
+      
+      if (settings && settings.loyaltyEnabled) {
+        if (user.loyaltyPoints < settings.minPointsToRedeem) {
+          return res.status(400).json({ message: `Minimum ${settings.minPointsToRedeem} points required to redeem` })
+        }
+        if (redeemPoints > user.loyaltyPoints) {
+          return res.status(400).json({ message: "Insufficient loyalty points" })
+        }
+        
+        const maxMoneyDiscount = totalAmount * (settings.maxRedemptionPercentage / 100)
+        const requestedMoneyDiscount = redeemPoints * settings.pointValue
+        
+        if (requestedMoneyDiscount > maxMoneyDiscount) {
+           return res.status(400).json({ message: `Points can only cover up to ${settings.maxRedemptionPercentage}% of the bill` })
+        }
+        
+        loyaltyDiscount = requestedMoneyDiscount
+        pointsToRedeem = redeemPoints
+      }
+    }
+
+    const finalAmount = totalAmount - (discount || 0) - loyaltyDiscount
 
     const Table = require("../models/Table")
     const table = await Table.findOne({ tableNumber })
@@ -129,12 +155,26 @@ router.post("/", auth, async (req, res) => {
       items: orderItems,
       totalAmount,
       couponCode: couponCode || null,
-      discount: discount || 0,
+      discount: (discount || 0) + loyaltyDiscount,
       finalAmount,
       specialInstructions: specialInstructions || "",
     })
 
     await order.save()
+    
+    if (pointsToRedeem > 0) {
+      user.loyaltyPoints -= pointsToRedeem
+      await user.save()
+      
+      const LoyaltyTransaction = require("../models/LoyaltyTransaction")
+      await LoyaltyTransaction.create({
+        user: user._id,
+        points: -pointsToRedeem,
+        type: "REDEEMED",
+        orderId: order._id,
+        description: `Redeemed points for order #${order._id.toString().substring(0, 8)}`
+      })
+    }
     
     // If coupon was used, increment its usage count
     if (couponCode) {
@@ -204,6 +244,32 @@ router.put("/:id/status", auth, adminAuth, async (req, res) => {
       if (activeOrders === 0) {
         const Table = require("../models/Table")
         await Table.updateMany({ currentUserId: order.user._id }, { status: "available", currentUserId: null })
+      }
+      
+      // Loyalty Earning Logic
+      if (status === "paid") {
+        const SystemSettings = require("../models/SystemSettings")
+        const settings = await SystemSettings.findOne({ isGlobal: true })
+        
+        if (settings && settings.loyaltyEnabled) {
+          const pointsEarned = Math.floor(order.finalAmount / settings.spendPerPoint)
+          if (pointsEarned > 0) {
+            const userObj = await User.findById(order.user._id)
+            if (userObj) {
+              userObj.loyaltyPoints += pointsEarned
+              await userObj.save()
+              
+              const LoyaltyTransaction = require("../models/LoyaltyTransaction")
+              await LoyaltyTransaction.create({
+                user: userObj._id,
+                points: pointsEarned,
+                type: "EARNED",
+                orderId: order._id,
+                description: `Earned points for order #${order._id.toString().substring(0, 8)}`
+              })
+            }
+          }
+        }
       }
     }
 
